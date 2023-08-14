@@ -27,7 +27,14 @@ function allowed(course, allowed_time){
     for (let i in allowed_time){
         //console.log(allowed_time[i], course.class_days, course.class_time, course.course, i)
         if ((allowed_time[i][0] == course.class_days) && (allowed_time[i][1] == course.class_time)){
-            return true
+            if (course.has_lab){
+                for (let j in allowed_time){
+                    if ((allowed_time[j][0] == course.lab_days) && (allowed_time[j][1] == course.lab_time)){
+                        return true
+                    }
+                }
+            }
+            else return true
         }
     }
     return false
@@ -58,11 +65,22 @@ export async function arrange(courses, num_of_courses, allowed_time){
         else if (!(table[arr1[i].class_days-1][arr1[i].class_time-1])){
             //console.log("bbb");
         }
+        else if (arr1[i].has_lab && ((!(table[arr1[i].lab_days-1][arr1[i].lab_time-1])) || (!(table[arr1[i].lab_days-1][arr1[i].lab_time])))){
+            //console.log('bbb.ccc')
+        }
         else if (!(allowed(arr1[i] , allowed_time))){
             //console.log("ccc");
         }
         else{
             table[arr1[i].class_days-1][arr1[i].class_time-1] = false;
+
+            if (arr1[i].class_days == 1) table[arr1[i].class_days+4][arr1[i].class_time-1] = false;
+            else table[arr1[i].class_days+1][arr1[i].class_time-1] = false;
+
+            if (arr1[i].has_lab){
+                table[arr1[i].lab_days-1][arr1[i].lab_time-1] = false;
+                table[arr1[i].lab_days-1][arr1[i].lab_time] = false;
+            }
             course_taken.push(arr1[i].course);
             stack.push(i);
         }
