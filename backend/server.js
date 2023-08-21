@@ -13,7 +13,6 @@ async function fetch_all_sections(courses){
         let arr2 = await response.json();
         arr1 = arr1.concat(arr2);
     }
-    console.log(arr1);
     return arr1;
 }
 
@@ -62,7 +61,6 @@ async function arrange(courses, num_of_courses, allowed_time){
     var stack = []
     let table = table_gen(6,6,true)
     arr1 = await fetch_all_sections(courses)
-    console.log(arr1)
     let i = 0
     while (1){
         //console.log(course_taken)
@@ -140,7 +138,6 @@ const fetch_data = async (s,userId) => {
         }
         exam.push({time: cls3[0].exam_time, date:cls3[0].exam_date, course: cls3[0].course})
     }
-    console.log(arr1,exam)
     return [arr1, exam]
     }
 
@@ -197,10 +194,10 @@ app.get("/classes/search_by_time/:class_time", async (req,res) => {
     }
 });
 
-app.get("/pre_req/:course", async (req,res) => {
+app.get("/courses", async (req,res) => {
     try {
         const { course } = req.params;
-        const all = await pool.query("select * from pre_req where course = ($1)",[course]);
+        const all = await pool.query("select * from pre_req");
         res.json(all.rows);
     } catch(err){
         console.error(err.message);
@@ -211,7 +208,6 @@ app.get("/classes/:id", async (req,res) => {
     try {
         const { id } = req.params;
         const all = await pool.query("select * from class_timetable where id = ($1)",[id]);
-        console.log(all.rows[0].course)
         res.json(all.rows);
     } catch(err){
         console.error(err.message);
@@ -272,7 +268,6 @@ app.get("/routine/:set/:user_id", async (req,res) => {
     try {
         const { set , user_id } = req.params;
         const all = await fetch_data(set, user_id)
-        console.log(all)
         res.json(all);
     } catch(err){
         console.error(err.message);
@@ -291,22 +286,68 @@ app.get("/course_info/:course", async (req,res) => {
 
 app.listen(4000);
 
-app.put("/auto_advise/:user_id/:set", async (req, res) =>{
+app.post("/auto_advise/:user_id/:set", async (req, res) =>{
     try {
         const {user_id , set} = req.params;
-        const { courses } = req.body;
-        console.log(courses)
+        const { courses, num } = req.body;
+        console.log(user_id , set, courses, num)
         const all = await pool.query(`select allowed_time_0, allowed_time_1 from users where id = ($1)`,[user_id]);
-        console.log(all.rows[0].allowed_time_0);
+        res.json(all.rows)
         allowed_time = []
+        console.log(courses, num)
         for (i in all.rows[0].allowed_time_0){
             allowed_time.push([all.rows[0].allowed_time_0[i],all.rows[0].allowed_time_1[i]])
         }
-        let r = await arrange(courses, 3, allowed_time)
-        res.json(r.map((x)=> x.id))
+        console.log(allowed_time)
+        let r = await arrange(courses, parseInt(num), allowed_time)
+        let a = []
+        for (i in r){
+            a.push(r[i].id)
+        }
+        console.log(`UPDATE users SET target_class_ids_${set} = '{${a}}' WHERE id = ${user_id}`)
+        all = await pool.query(`UPDATE users SET target_class_ids_${set} = '{${a}}' WHERE id = ${user_id}`)
+        
     }
     catch(err){
         console.error(err.message)
     }
-})
+});
 
+app.post("/login", async (req, res) => {
+    const { email, password } = req.body;
+    const all = await pool.query("select * from users where email = '"+ email + "'");
+    const user = await all.rows
+    console.log("select * from users where email = '"+ email + "'", password, user[0].password)
+      if (user[0]) {
+        //check password
+        if (password == user[0].password) {
+          res.send({ message: "Login successfully", user:user[0] });
+        } else {
+          res.send({ message: "Password and confirm password didn't match" });
+        }
+      } else {
+        res.send({ message: "Please login to proceed" });
+      }
+    });
+
+app.post("/signup", async (req, res) => {
+    const { fname, lname, email, password } = req.body;
+    const all = await pool.query("select * from users where email = ($1)",[email]);
+    const user = await all
+    console.log(user.rows)
+    if (user.rows[0]) {
+    res.send({ message: "User is already registerd" });
+    } else {
+    try{
+    const all2 = await pool.query("INSERT INTO users (name , email, password) VALUES (($1) , ($2), ($3))",[fname+lname, email, password]);
+    res.send({ message: "Account has been created!! Please Login" });
+    }
+    catch(err){
+        if (err) {
+        res.send(err);
+        }
+        }
+    }
+    });
+        // res.send("register");
+        //   console.log(req.body);
